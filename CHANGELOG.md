@@ -1,5 +1,11 @@
 # @qcksys/jira-extention
 
+## 0.2.2
+
+### Patch Changes
+
+- c74ecc7: fix release workflow: gate zip build and GitHub release on `git tag --points-at HEAD` instead of the `changesets/action` `published` output, which can silently miss new tags
+
 ## 0.2.1
 
 ### Patch Changes
