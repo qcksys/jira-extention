@@ -1,5 +1,11 @@
 # @qcksys/jira-extention
 
+## 0.2.3
+
+### Patch Changes
+
+- bc8d73e: fix release workflow: set `privatePackages: { version: true, tag: true }` in `.changeset/config.json` so `changeset tag` actually creates git tags for this private package (default skips `"private": true` packages)
+
 ## 0.2.2
 
 ### Patch Changes
