@@ -1,5 +1,11 @@
 # @qcksys/jira-extention
 
+## 0.2.1
+
+### Patch Changes
+
+- 0787d99: fix release workflow: pin Node 24 and call `changeset` binary directly so `vp exec` banner output doesn't break the tag-detection parsing that gates the zip build
+
 ## 0.2.0
 
 ### Minor Changes
