@@ -11,7 +11,9 @@ export default defineContentScript({
             void (async () => {
                 const results: LogResult[] = [];
                 for (const entry of message.entries) {
-                    results.push(await postWorklog(window.location.origin, entry));
+                    results.push(
+                        await postWorklog(window.location.origin, entry, message.reportingFormat),
+                    );
                 }
                 const response: WorklogResponse = { results };
                 sendResponse(response);
@@ -22,10 +24,11 @@ export default defineContentScript({
 });
 
 function isWorklogRequest(msg: unknown): msg is WorklogRequest {
+    if (typeof msg !== 'object' || msg === null) return false;
+    const m = msg as { type?: unknown; entries?: unknown; reportingFormat?: unknown };
     return (
-        typeof msg === 'object' &&
-        msg !== null &&
-        (msg as { type?: unknown }).type === 'log-worklogs' &&
-        Array.isArray((msg as { entries?: unknown }).entries)
+        m.type === 'log-worklogs' &&
+        Array.isArray(m.entries) &&
+        (m.reportingFormat === 'seconds' || m.reportingFormat === 'days')
     );
 }

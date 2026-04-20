@@ -1,85 +1,102 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { Check, Loader2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Textarea } from '~/components/ui/textarea';
 import { cn } from '~/lib/utils';
-import { getSettings } from '~/utils/config';
+import { useComposer } from '~/state/composer';
+import { type ActiveTarget, useActiveTarget, useSettings } from '~/state/hooks';
 import { parseLogBlock } from '~/utils/parser';
 import type {
     LogResult,
-    ParseResult,
+    ParsedEntry,
+    ReportingFormat,
     Settings,
     WorklogRequest,
     WorklogResponse,
 } from '~/utils/types';
 
-type Status =
-    | { kind: 'idle' }
-    | { kind: 'submitting' }
-    | { kind: 'done'; results: LogResult[] }
-    | { kind: 'error'; message: string };
+interface SubmitPayload {
+    entries: ParsedEntry[];
+    target: ActiveTarget;
+    reportingFormat: ReportingFormat;
+}
 
-const JIRA_HOST_RE = /\.atlassian\.net$/;
+async function postJira(
+    tabId: number,
+    entries: ParsedEntry[],
+    reportingFormat: ReportingFormat,
+): Promise<LogResult[]> {
+    const req: WorklogRequest = { type: 'log-worklogs', entries, reportingFormat };
+    const resp = (await browser.tabs.sendMessage(tabId, req)) as WorklogResponse | undefined;
+    if (!resp) {
+        throw new Error('No response from Jira content script. Refresh the tab.');
+    }
+    return resp.results;
+}
 
 export function Logger() {
-    const [settings, setSettings] = useState<Settings | null>(null);
-    const [input, setInput] = useState('');
-    const [status, setStatus] = useState<Status>({ kind: 'idle' });
+    const { data: settings } = useSettings();
+    const { input, setInput } = useComposer();
+    const targetQuery = useActiveTarget();
+    const target = targetQuery.data;
+    const [results, setResults] = useState<LogResult[] | null>(null);
 
-    useEffect(() => {
-        void getSettings().then(setSettings);
-    }, []);
+    const submitMutation = useMutation({
+        mutationFn: async ({ entries, target, reportingFormat }: SubmitPayload) => {
+            if (target.kind !== 'jira') {
+                throw new Error('Open a Jira Cloud tab (*.atlassian.net) in the active window.');
+            }
+            return postJira(target.tabId, entries, reportingFormat);
+        },
+        onSuccess: (r) => setResults(r),
+    });
 
-    const preview: ParseResult | null = useMemo(() => {
+    const preview = useMemo(() => {
         if (!settings) return null;
         return parseLogBlock(input, settings);
     }, [input, settings]);
 
+    const entryCount = preview?.entries.length ?? 0;
     const canSubmit =
-        status.kind !== 'submitting' &&
+        !submitMutation.isPending &&
         !!preview &&
         preview.entries.length > 0 &&
-        preview.errors.length === 0;
+        preview.errors.length === 0 &&
+        target?.kind === 'jira';
 
-    async function submit() {
-        if (!preview) return;
-        setStatus({ kind: 'submitting' });
-        try {
-            const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-            const host = tab?.url ? new URL(tab.url).hostname : '';
-            if (!tab?.id || !JIRA_HOST_RE.test(host)) {
-                setStatus({
-                    kind: 'error',
-                    message: 'Open a Jira Cloud tab (*.atlassian.net) in the active window.',
-                });
-                return;
-            }
-            const req: WorklogRequest = { type: 'log-worklogs', entries: preview.entries };
-            const resp = (await browser.tabs.sendMessage(tab.id, req)) as
-                | WorklogResponse
-                | undefined;
-            if (!resp) {
-                setStatus({
-                    kind: 'error',
-                    message: 'No response from content script. Refresh the Jira tab.',
-                });
-                return;
-            }
-            setStatus({ kind: 'done', results: resp.results });
-        } catch (err) {
-            setStatus({ kind: 'error', message: (err as Error).message });
-        }
+    function submit() {
+        if (!preview || !settings || !target || target.kind !== 'jira') return;
+        setResults(null);
+        submitMutation.mutate({
+            entries: preview.entries,
+            target,
+            reportingFormat: settings.reportingFormat,
+        });
     }
 
     const placeholderDate = useMemo(() => {
         const date = new Date();
-
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }, []);
 
     return (
         <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Target:</span>
+                {target?.kind === 'jira' ? (
+                    <span className="rounded bg-accent px-1.5 py-0.5 font-mono text-accent-foreground">
+                        Jira
+                    </span>
+                ) : (
+                    <span className="text-destructive">
+                        No Jira tab is active — switch to{' '}
+                        <code className="font-mono">*.atlassian.net</code>.
+                    </span>
+                )}
+            </div>
+
             <Textarea
                 className="font-mono text-xs"
                 placeholder={`${placeholderDate}\nTICKET-1 | 1 | Note\nTICKET-2 | 2.5 | Note Two`}
@@ -88,7 +105,7 @@ export function Logger() {
                 rows={10}
             />
 
-            {preview && (preview.entries.length > 0 || preview.errors.length > 0) && (
+            {preview && (preview.entries.length > 0 || preview.errors.length > 0) && settings && (
                 <Card size="sm">
                     <CardHeader>
                         <CardTitle>
@@ -108,8 +125,8 @@ export function Logger() {
                                 {preview.entries.map((e, i) => (
                                     <li key={i}>
                                         <code className="font-mono">{e.key}</code> ·{' '}
-                                        {formatDuration(e.seconds)} · {e.date} {timePart(e.started)}{' '}
-                                        · {e.comment}
+                                        {formatDuration(e, settings)} · {e.date}{' '}
+                                        {timePart(e.started)} · {e.comment}
                                     </li>
                                 ))}
                             </ul>
@@ -134,17 +151,32 @@ export function Logger() {
                 </Card>
             )}
 
-            <Button disabled={!canSubmit} onClick={() => void submit()}>
-                {status.kind === 'submitting' ? 'Logging…' : 'Log time'}
+            <Button disabled={!canSubmit} onClick={submit}>
+                {submitMutation.isPending ? (
+                    <>
+                        <Loader2 className="size-4 animate-spin" /> Logging {entryCount}{' '}
+                        {entryCount === 1 ? 'entry' : 'entries'}…
+                    </>
+                ) : target?.kind === 'jira' ? (
+                    'Log time to Jira'
+                ) : (
+                    'Log time'
+                )}
             </Button>
 
-            {status.kind === 'error' && (
-                <p className="text-destructive text-sm">{status.message}</p>
+            {submitMutation.isPending && (
+                <p className="text-muted-foreground text-xs">Posting — don't close the popup.</p>
             )}
 
-            {status.kind === 'done' && (
+            {submitMutation.error && (
+                <p className="text-destructive text-sm">
+                    {(submitMutation.error as Error).message}
+                </p>
+            )}
+
+            {results && (
                 <ul className="flex flex-col gap-1 text-xs">
-                    {status.results.map((r, i) => (
+                    {results.map((r, i) => (
                         <li
                             key={i}
                             className={cn(
@@ -168,12 +200,18 @@ export function Logger() {
     );
 }
 
-function formatDuration(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.round((seconds % 3600) / 60);
+function formatDuration(entry: ParsedEntry, settings: Settings): string {
+    if (settings.reportingFormat === 'days') return `${trimDays(entry.days)}d`;
+    const h = Math.floor(entry.seconds / 3600);
+    const m = Math.round((entry.seconds % 3600) / 60);
     if (h && m) return `${h}h${m}m`;
     if (h) return `${h}h`;
     return `${m}m`;
+}
+
+function trimDays(days: number): string {
+    const fixed = days.toFixed(4);
+    return fixed.replace(/\.?0+$/, '') || '0';
 }
 
 function timePart(iso: string): string {

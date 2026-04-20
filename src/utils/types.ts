@@ -1,5 +1,6 @@
 export type TimeUnit = 'hours' | 'minutes' | 'days';
 export type StartTimeMode = 'fixed' | 'sequential';
+export type ReportingFormat = 'seconds' | 'days';
 
 export interface Settings {
     dateRegex: string;
@@ -8,12 +9,14 @@ export interface Settings {
     hoursPerDay: number;
     startTimeMode: StartTimeMode;
     startTime: string;
+    reportingFormat: ReportingFormat;
 }
 
 export interface ParsedEntry {
     date: string;
     key: string;
     seconds: number;
+    days: number;
     comment: string;
     started: string;
 }
@@ -37,5 +40,9 @@ export interface LogResult {
     worklogId?: string;
 }
 
-export type WorklogRequest = { type: 'log-worklogs'; entries: ParsedEntry[] };
+export type WorklogRequest = {
+    type: 'log-worklogs';
+    entries: ParsedEntry[];
+    reportingFormat: ReportingFormat;
+};
 export type WorklogResponse = { results: LogResult[] };

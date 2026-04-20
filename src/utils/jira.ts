@@ -1,7 +1,11 @@
 import ky, { HTTPError } from 'ky';
-import type { LogResult, ParsedEntry } from './types';
+import type { LogResult, ParsedEntry, ReportingFormat } from './types';
 
-export async function postWorklog(origin: string, entry: ParsedEntry): Promise<LogResult> {
+export async function postWorklog(
+    origin: string,
+    entry: ParsedEntry,
+    reportingFormat: ReportingFormat,
+): Promise<LogResult> {
     const url = `${origin}/rest/api/2/issue/${encodeURIComponent(entry.key)}/worklog`;
     try {
         const body = await ky
@@ -9,7 +13,7 @@ export async function postWorklog(origin: string, entry: ParsedEntry): Promise<L
                 credentials: 'include',
                 headers: { 'X-Atlassian-Token': 'no-check' },
                 json: {
-                    timeSpentSeconds: entry.seconds,
+                    ...worklogDurationPayload(entry, reportingFormat),
                     started: entry.started,
                     comment: entry.comment,
                 },
@@ -30,4 +34,20 @@ export async function postWorklog(origin: string, entry: ParsedEntry): Promise<L
         }
         return { key: entry.key, ok: false, error: (err as Error).message };
     }
+}
+
+function worklogDurationPayload(
+    entry: ParsedEntry,
+    reportingFormat: ReportingFormat,
+): { timeSpent: string } | { timeSpentSeconds: number } {
+    if (reportingFormat === 'days') {
+        return { timeSpent: `${formatDays(entry.days)}d` };
+    }
+    return { timeSpentSeconds: entry.seconds };
+}
+
+function formatDays(days: number): string {
+    // Strip trailing zeros but keep decimals when meaningful (0.3, 1.5, 1).
+    const fixed = days.toFixed(4);
+    return fixed.replace(/\.?0+$/, '') || '0';
 }

@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
     hoursPerDay: 8,
     startTimeMode: 'fixed',
     startTime: '09:00',
+    reportingFormat: 'seconds',
 };
 
 const KEY = 'local:settings';

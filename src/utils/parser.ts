@@ -11,10 +11,12 @@ function secondsPerUnit(settings: Settings): number {
     }
 }
 
-function toSeconds(raw: string, settings: Settings): number | null {
+function toDuration(raw: string, settings: Settings): { seconds: number; days: number } | null {
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return Math.round(n * secondsPerUnit(settings));
+    const seconds = Math.round(n * secondsPerUnit(settings));
+    const days = seconds / (settings.hoursPerDay * 3600);
+    return { seconds, days };
 }
 
 function formatStarted(date: string, hhmm: string): string {
@@ -99,15 +101,16 @@ export function parseLogBlock(input: string, settings: Settings): ParseResult {
                 });
                 return;
             }
-            const seconds = toSeconds(hours, settings);
-            if (seconds == null) {
+            const duration = toDuration(hours, settings);
+            if (duration == null) {
                 errors.push({ line: lineNum, text: line, reason: `Invalid duration "${hours}"` });
                 return;
             }
             const entry: ParsedEntry = {
                 date: currentDate,
                 key,
-                seconds,
+                seconds: duration.seconds,
+                days: duration.days,
                 comment: comment.trim(),
                 started: '',
             };
