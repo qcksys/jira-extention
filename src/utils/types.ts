@@ -1,10 +1,11 @@
-export type TimeUnit = 'hours' | 'minutes';
+export type TimeUnit = 'hours' | 'minutes' | 'days';
 export type StartTimeMode = 'fixed' | 'sequential';
 
 export interface Settings {
     dateRegex: string;
     entryRegex: string;
     timeUnit: TimeUnit;
+    hoursPerDay: number;
     startTimeMode: StartTimeMode;
     startTime: string;
 }

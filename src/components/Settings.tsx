@@ -83,9 +83,26 @@ export function Settings() {
                     <SelectContent>
                         <SelectItem value="hours">decimal hours (2 = 2h, .75 = 45m)</SelectItem>
                         <SelectItem value="minutes">minutes (120 = 2h, 45 = 45m)</SelectItem>
+                        <SelectItem value="days">
+                            days (1 = {draft.hoursPerDay}h, 0.5 = {draft.hoursPerDay / 2}h)
+                        </SelectItem>
                     </SelectContent>
                 </Select>
             </div>
+
+            {draft.timeUnit === 'days' && (
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="hoursPerDay">Hours per day</Label>
+                    <Input
+                        id="hoursPerDay"
+                        type="number"
+                        min="0.1"
+                        step="0.25"
+                        value={draft.hoursPerDay}
+                        onChange={(e) => update('hoursPerDay', Number(e.target.value))}
+                    />
+                </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
                 <Label>Start-time mode</Label>

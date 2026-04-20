@@ -13,12 +13,13 @@ This repo uses Vite+ (`vp`) **and** WXT. WXT owns the build/dev pipeline; Vite+ 
 - `vp run dev` — WXT dev (Chromium). `vp run dev:firefox` for Firefox.
 - `vp run build` / `vp run build:firefox` — production build to `.output/`.
 - `vp run zip` / `vp run zip:firefox` — package for store upload.
-- `vp check` — format + lint + type-check (Vite+ built-in).
 - `vp test` — Vitest (import test utilities from `vite-plus/test`, not `vitest`).
-- `vp run format` — Biome format write. `vp run format:check` for CI.
+- `vp run format` — **Biome** format write. `vp run format:check` for CI.
 - `vp install` — install deps (runs `wxt prepare` postinstall to regenerate `.wxt/`).
 
-Formatting/linting: **Biome** (linter disabled, formatter only — 4-space indent, single quotes, JSX double quotes, 100 col). WXT generates `.wxt/tsconfig.json` which `tsconfig.json` extends — re-run `vp install` or `pnpx wxt prepare` if path aliases break.
+**Formatting/linting is Biome, NOT Vite+ (oxfmt/oxlint).** Do not run `vp fmt`, `vp lint`, or `vp check` — they use oxfmt/oxlint which disagree with `biome.json` (reformat to 2-space + double quotes). Use `vp run format` / `vp run format:check` for formatting and `pnpx tsc --noEmit` (or an equivalent script) for type-checking.
+
+Biome config (`biome.json`): linter disabled, formatter only — 4-space indent, single quotes, JSX double quotes, 100 col. `.editorconfig` mirrors these rules for editors. WXT generates `.wxt/tsconfig.json` which `tsconfig.json` extends — re-run `vp install` or `pnpx wxt prepare` if path aliases break.
 
 ## Architecture
 
@@ -135,5 +136,5 @@ For GitHub Actions, consider using [`voidzero-dev/setup-vp`](https://github.com/
 ## Review Checklist for Agents
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
-- [ ] Run `vp check` and `vp test` to validate changes.
+- [ ] Run `vp run format` and `vp test` to validate changes. **Do not run `vp check` / `vp fmt` / `vp lint`** — this project uses Biome, and those commands apply oxfmt/oxlint rules that conflict with `biome.json`.
 <!--VITE PLUS END-->

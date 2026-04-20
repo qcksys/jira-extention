@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Create Release PR or tag release
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: vp exec changeset version
+          publish: vp exec changeset tag
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build extension zips
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          vp run zip
+          vp run zip:firefox
+
+      - name: Extract release notes
+        if: steps.changesets.outputs.published == 'true'
+        id: notes
+        env:
+          PACKAGES_JSON: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          VERSION=$(echo "$PACKAGES_JSON" | jq -r '.[0].version')
+          awk -v ver="## ${VERSION}" '
+              $0 == ver { found=1; next }
+              found && /^## / { exit }
+              found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          # Fall back to auto-generated notes if the section is empty
+          if [ ! -s RELEASE_NOTES.md ]; then
+              echo "Release v${VERSION}" > RELEASE_NOTES.md
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES_JSON: ${{ steps.changesets.outputs.publishedPackages }}
+          VERSION: ${{ steps.notes.outputs.version }}
+        run: |
+          TAG=$(echo "$PACKAGES_JSON" | jq -r '.[0] | "\(.name)@\(.version)"')
+          gh release create "$TAG" \
+              --title "v${VERSION}" \
+              --notes-file RELEASE_NOTES.md \
+              .output/*.zip

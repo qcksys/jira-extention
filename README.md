@@ -41,14 +41,14 @@ Authentication is the reason for the split architecture: the popup cannot send a
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `vp run dev` / `vp run dev:firefox` | WXT dev build with HMR |
-| `vp run build` / `vp run build:firefox` | Production build to `.output/` |
-| `vp run zip` / `vp run zip:firefox` | Package for store upload |
-| `vp check` | Format, lint, and type-check |
-| `vp test` | Vitest (import from `vite-plus/test`) |
-| `vp run format` | Biome format (write) |
+| Command                                 | What it does                          |
+| --------------------------------------- | ------------------------------------- |
+| `vp run dev` / `vp run dev:firefox`     | WXT dev build with HMR                |
+| `vp run build` / `vp run build:firefox` | Production build to `.output/`        |
+| `vp run zip` / `vp run zip:firefox`     | Package for store upload              |
+| `vp check`                              | Format, lint, and type-check          |
+| `vp test`                               | Vitest (import from `vite-plus/test`) |
+| `vp run format`                         | Biome format (write)                  |
 
 ## Stack
 

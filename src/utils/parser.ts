@@ -1,9 +1,20 @@
 import type { ParseError, ParseResult, ParsedEntry, Settings } from './types';
 
-function toSeconds(raw: string, unit: Settings['timeUnit']): number | null {
+function secondsPerUnit(settings: Settings): number {
+    switch (settings.timeUnit) {
+        case 'hours':
+            return 3600;
+        case 'minutes':
+            return 60;
+        case 'days':
+            return settings.hoursPerDay * 3600;
+    }
+}
+
+function toSeconds(raw: string, settings: Settings): number | null {
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
-    return Math.round(unit === 'hours' ? n * 3600 : n * 60);
+    return Math.round(n * secondsPerUnit(settings));
 }
 
 function formatStarted(date: string, hhmm: string): string {
@@ -88,7 +99,7 @@ export function parseLogBlock(input: string, settings: Settings): ParseResult {
                 });
                 return;
             }
-            const seconds = toSeconds(hours, settings.timeUnit);
+            const seconds = toSeconds(hours, settings);
             if (seconds == null) {
                 errors.push({ line: lineNum, text: line, reason: `Invalid duration "${hours}"` });
                 return;
