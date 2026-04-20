@@ -48,8 +48,11 @@ jobs:
         run: |
           TAG=$(git tag --points-at HEAD | head -n 1)
           if [ -n "$TAG" ]; then
+              # Strip either the `@scope/name@` prefix (monorepo) or the leading `v` (single package)
+              VERSION="${TAG##*@}"
+              VERSION="${VERSION#v}"
               echo "name=$TAG" >> "$GITHUB_OUTPUT"
-              echo "version=${TAG##*@}" >> "$GITHUB_OUTPUT"
+              echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build extension zips
@@ -73,14 +76,19 @@ jobs:
               echo "Release v${VERSION}" > RELEASE_NOTES.md
           fi
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         if: steps.tag.outputs.name
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.name }}
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          gh release create "$TAG" \
-              --title "v${VERSION}" \
-              --notes-file RELEASE_NOTES.md \
-              .output/*.zip
+          if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release edit "$TAG" --title "v${VERSION}" --notes-file RELEASE_NOTES.md
+              gh release upload "$TAG" .output/*.zip --clobber
+          else
+              gh release create "$TAG" \
+                  --title "v${VERSION}" \
+                  --notes-file RELEASE_NOTES.md \
+                  .output/*.zip
+          fi
