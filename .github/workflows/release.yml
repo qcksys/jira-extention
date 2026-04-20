@@ -43,19 +43,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Detect release tag
+        id: tag
+        run: |
+          TAG=$(git tag --points-at HEAD | head -n 1)
+          if [ -n "$TAG" ]; then
+              echo "name=$TAG" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG##*@}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build extension zips
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.tag.outputs.name
         run: |
           vp run zip
           vp run zip:firefox
 
       - name: Extract release notes
-        if: steps.changesets.outputs.published == 'true'
-        id: notes
+        if: steps.tag.outputs.name
         env:
-          PACKAGES_JSON: ${{ steps.changesets.outputs.publishedPackages }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          VERSION=$(echo "$PACKAGES_JSON" | jq -r '.[0].version')
           awk -v ver="## ${VERSION}" '
               $0 == ver { found=1; next }
               found && /^## / { exit }
@@ -65,16 +72,14 @@ jobs:
           if [ ! -s RELEASE_NOTES.md ]; then
               echo "Release v${VERSION}" > RELEASE_NOTES.md
           fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.tag.outputs.name
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PACKAGES_JSON: ${{ steps.changesets.outputs.publishedPackages }}
-          VERSION: ${{ steps.notes.outputs.version }}
+          TAG: ${{ steps.tag.outputs.name }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          TAG=$(echo "$PACKAGES_JSON" | jq -r '.[0] | "\(.name)@\(.version)"')
           gh release create "$TAG" \
               --title "v${VERSION}" \
               --notes-file RELEASE_NOTES.md \
