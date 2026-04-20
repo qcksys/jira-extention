@@ -26,6 +26,7 @@ jobs:
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1
         with:
+          node-version: 24
           cache: true
 
       - name: Install dependencies
@@ -35,8 +36,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: vp exec changeset version
-          publish: vp exec changeset tag
+          version: node_modules/.bin/changeset version
+          publish: node_modules/.bin/changeset tag
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
